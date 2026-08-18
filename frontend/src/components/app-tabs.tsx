@@ -1,7 +1,7 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Colors, Surface } from '@/constants/theme';
 
 export default function AppTabs() {
   const scheme = useColorScheme();
@@ -9,17 +9,21 @@ export default function AppTabs() {
 
   return (
     <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
+      backgroundColor={Surface.base}
+      indicatorColor={Surface.elevated}
+      labelStyle={{ selected: { color: colors.accent }, default: { color: colors.textSecondary } }}
+    >
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
       </NativeTabs.Trigger>
 
-    </NativeTabs >
+      <NativeTabs.Trigger name="meals">
+        <NativeTabs.Trigger.Label>Meals</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

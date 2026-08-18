@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, useWindowDimensions, Platform } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { Accent, Surface } from '@/constants/theme';
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export interface CalorieProgressRingProps {
@@ -32,9 +34,9 @@ export default function CalorieProgressRing({
     max = 3000,
     size,
     strokeWidth,
-    color = '#9ACD32',
+    color = Accent.green,
     trackColor = '#3A3A3A',
-    backgroundColor = '#1C1C1C',
+    backgroundColor = Surface.card,
     label = 'kcal',
 }: CalorieProgressRingProps) {
     const { width } = useWindowDimensions();

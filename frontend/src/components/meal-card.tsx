@@ -1,241 +1,319 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export interface Meal {
-    /** Unique id for this meal */
-    id: string;
-    /** e.g. "Breakfast", "Snack", or any custom name the user picks */
-    name: string;
-    /** Optional small tag next to the name, e.g. "Now" */
-    subtitle?: string;
-    /** Calories allocated/planned for this meal */
-    targetCalories: number;
-    /** Whether the user has marked this meal as logged/done */
-    completed: boolean;
-}
+import AddFoodModal from '@/components/add-food-modal';
+import FoodItem from '@/components/food-item';
+import { Accent, Surface } from '@/constants/theme';
+import type { Food, Meal } from '@/types/nutrition';
+import { getMealCalories } from '@/utils/nutrition';
 
-export interface MealListProps {
-    meals: Meal[];
-    /** Called when the checkbox is tapped for a meal */
-    onToggleComplete: (id: string) => void;
-    /** Called when the "add food" button is tapped for a meal */
-    onAddFood: (id: string) => void;
-    /** Called when the user taps "Add meal" at the bottom. Omit to hide the button. */
-    onAddMeal?: () => void;
-    /** Colors, all optional so you can wire in your theme later */
-    colors?: {
-        background?: string;
-        rowActive?: string;
-        border?: string;
-        textPrimary?: string;
-        textDim?: string;
-        accent?: string;
-        checkboxBorder?: string;
-    };
-}
-
-const defaultColors = {
-    background: '#1C1C1C',
-    rowActive: '#242424',
-    border: '#2E2E2E',
-    textPrimary: '#FFFFFF',
-    textDim: '#6E6E6E',
-    accent: '#9ACD32',
-    checkboxBorder: '#4A4A4A',
+export type MealListProps = {
+  meals: Meal[];
+  currentMealId?: string;
+  suggestedCalories: Map<string, number>;
+  onToggleComplete: (id: string) => void;
+  onAddFood: (mealId: string, food: Food) => void;
+  onRemoveFood: (mealId: string, foodId: string) => void;
+  onAddMeal?: () => void;
+  expanded?: boolean;
 };
 
 export default function MealList({
-    meals,
-    onToggleComplete,
-    onAddFood,
-    onAddMeal,
-    colors: colorOverrides,
+  meals,
+  currentMealId,
+  suggestedCalories,
+  onToggleComplete,
+  onAddFood,
+  onRemoveFood,
+  onAddMeal,
+  expanded = true,
 }: MealListProps) {
-    const colors = { ...defaultColors, ...colorOverrides };
+  const [addFoodMealId, setAddFoodMealId] = useState<string | null>(null);
+  const sortedMeals = [...meals].sort((a, b) => a.order - b.order);
+  const addFoodMeal = sortedMeals.find((m) => m.id === addFoodMealId);
 
-    // The first not-yet-completed meal is treated as the "current" one,
-    // getting a highlighted row background, matching an active/"Now" state.
-    const currentId = meals.find((m) => !m.completed)?.id;
+  return (
+    <>
+      <View style={styles.container}>
+        {sortedMeals.map((meal, index) => (
+          <MealCard
+            key={meal.id}
+            meal={meal}
+            isCurrent={meal.id === currentMealId}
+            isLast={index === sortedMeals.length - 1}
+            suggestedCalories={suggestedCalories.get(meal.id)}
+            onToggleComplete={() => onToggleComplete(meal.id)}
+            onAddFood={() => setAddFoodMealId(meal.id)}
+            onRemoveFood={(foodId) => onRemoveFood(meal.id, foodId)}
+            expanded={expanded}
+          />
+        ))}
 
-    return (
-        <View style={[styles.container, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            {meals.map((meal, index) => (
-                <MealRow
-                    key={meal.id}
-                    meal={meal}
-                    isCurrent={meal.id === currentId}
-                    isLast={index === meals.length - 1}
-                    colors={colors}
-                    onToggleComplete={() => onToggleComplete(meal.id)}
-                    onAddFood={() => onAddFood(meal.id)}
-                />
-            ))}
+        {onAddMeal && (
+          <Pressable
+            onPress={onAddMeal}
+            style={({ pressed }) => [styles.addMealRow, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <View style={styles.plusCircle}>
+              <Text style={styles.plusText}>+</Text>
+            </View>
+            <Text style={styles.addMealText}>Add meal</Text>
+          </Pressable>
+        )}
+      </View>
 
-            {onAddMeal && (
-                <Pressable
-                    onPress={onAddMeal}
-                    style={({ pressed }) => [
-                        styles.addMealRow,
-                        { opacity: pressed ? 0.6 : 1 },
-                    ]}
-                >
-                    <View style={[styles.plusCircle, { borderColor: colors.checkboxBorder }]}>
-                        <Text style={[styles.plusText, { color: colors.textDim }]}>+</Text>
-                    </View>
-                    <Text style={[styles.addMealText, { color: colors.textDim }]}>Add meal</Text>
-                </Pressable>
-            )}
-        </View>
-    );
+      {addFoodMeal && (
+        <AddFoodModal
+          visible={addFoodMealId != null}
+          mealName={addFoodMeal.name}
+          onClose={() => setAddFoodMealId(null)}
+          onAdd={(food) => onAddFood(addFoodMeal.id, food)}
+        />
+      )}
+    </>
+  );
 }
 
-function MealRow({
-    meal,
-    isCurrent,
-    isLast,
-    colors,
-    onToggleComplete,
-    onAddFood,
-}: {
-    meal: Meal;
-    isCurrent: boolean;
-    isLast: boolean;
-    colors: Required<NonNullable<MealListProps['colors']>>;
-    onToggleComplete: () => void;
-    onAddFood: () => void;
-}) {
-    const kcalColor = meal.completed ? colors.accent : isCurrent ? colors.textPrimary : colors.textDim;
-    const nameColor = meal.completed || isCurrent ? colors.textPrimary : colors.textDim;
+type MealCardProps = {
+  meal: Meal;
+  isCurrent: boolean;
+  isLast: boolean;
+  suggestedCalories?: number;
+  onToggleComplete: () => void;
+  onAddFood: () => void;
+  onRemoveFood: (foodId: string) => void;
+  expanded: boolean;
+};
 
-    return (
-        <View
-            style={[
-                styles.row,
-                !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-                isCurrent && { backgroundColor: colors.rowActive },
-            ]}
-        >
-            <Pressable
-                onPress={onToggleComplete}
-                hitSlop={8}
-                style={[
-                    styles.checkbox,
-                    {
-                        borderColor: meal.completed ? colors.accent : colors.checkboxBorder,
-                        backgroundColor: meal.completed ? colors.accent : 'transparent',
-                    },
-                ]}
-            >
-                {meal.completed && <Text style={styles.checkmark}>✓</Text>}
-            </Pressable>
+function MealCard({
+  meal,
+  isCurrent,
+  isLast,
+  suggestedCalories,
+  onToggleComplete,
+  onAddFood,
+  onRemoveFood,
+  expanded,
+}: MealCardProps) {
+  const mealCalories = getMealCalories(meal);
+  const kcalColor = meal.completed ? Accent.green : isCurrent ? '#FFFFFF' : Surface.textDim;
+  const nameColor = meal.completed || isCurrent ? '#FFFFFF' : Surface.textDim;
 
-            <View style={styles.nameWrapper}>
-                <Text style={[styles.nameText, { color: nameColor }]} numberOfLines={1}>
-                    {meal.name}
-                </Text>
-                {isCurrent && meal.subtitle && (
-                    <Text style={[styles.subtitleText, { color: colors.textDim }]}> — {meal.subtitle}</Text>
-                )}
-            </View>
+  return (
+    <View
+      style={[
+        styles.row,
+        !isLast && styles.rowBorder,
+        isCurrent && styles.rowCurrent,
+        meal.completed && styles.rowCompleted,
+      ]}
+    >
+      <Pressable
+        onPress={onToggleComplete}
+        hitSlop={8}
+        style={[
+          styles.checkbox,
+          {
+            borderColor: meal.completed ? Accent.green : '#4A4A4A',
+            backgroundColor: meal.completed ? Accent.green : 'transparent',
+          },
+        ]}
+      >
+        {meal.completed && <Text style={styles.checkmark}>✓</Text>}
+      </Pressable>
 
-            <Text style={[styles.kcalText, { color: kcalColor }]}>
-                {meal.targetCalories.toLocaleString()} kcal
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.nameWrapper}>
+            <Text style={[styles.nameText, { color: nameColor }]} numberOfLines={1}>
+              {meal.name}
             </Text>
+            {isCurrent && !meal.completed && (
+              <Text style={styles.currentBadge}> — current meal</Text>
+            )}
+            {meal.completed && <Text style={styles.completedBadge}> — completed</Text>}
+          </View>
 
+          <View style={styles.kcalRow}>
+            <Text style={[styles.kcalText, { color: kcalColor }]}>
+              {mealCalories.toLocaleString()} kcal
+            </Text>
             <Pressable
-                onPress={onAddFood}
-                hitSlop={8}
-                style={({ pressed }) => [
-                    styles.addFoodButton,
-                    { borderColor: colors.checkboxBorder, opacity: pressed ? 0.6 : 1 },
-                ]}
+              onPress={onAddFood}
+              hitSlop={8}
+              style={({ pressed }) => [styles.addFoodButton, { opacity: pressed ? 0.6 : 1 }]}
             >
-                <Text style={[styles.addFoodText, { color: colors.textPrimary }]}>+</Text>
+              <Text style={styles.addFoodText}>+</Text>
             </Pressable>
+          </View>
         </View>
-    );
+
+        {!meal.completed && suggestedCalories != null && suggestedCalories > 0 && (
+          <Text style={styles.suggestion}>
+            Suggested: ~{suggestedCalories.toLocaleString()} kcal
+          </Text>
+        )}
+
+        {expanded && meal.foods.length > 0 && (
+          <View style={styles.foods}>
+            {meal.foods.map((food) => (
+              <FoodItem
+                key={food.id}
+                food={food}
+                compact
+                onRemove={() => onRemoveFood(food.id)}
+              />
+            ))}
+          </View>
+        )}
+
+        {expanded && (
+          <Pressable onPress={onAddFood} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+            <Text style={styles.addFoodLink}>+ add food</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        borderRadius: 16,
-        borderWidth: StyleSheet.hairlineWidth,
-        overflow: 'hidden',
-        alignSelf: 'stretch',
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        gap: 12,
-    },
-    checkbox: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 1.5,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    checkmark: {
-        color: '#111111',
-        fontSize: 13,
-        fontWeight: '700',
-    },
-    nameWrapper: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'baseline',
-    },
-    nameText: {
-        fontSize: 15,
-        fontWeight: '500',
-    },
-    subtitleText: {
-        fontSize: 13,
-        fontWeight: '400',
-    },
-    kcalText: {
-        fontSize: 14,
-        fontWeight: '700',
-    },
-    addFoodButton: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        borderWidth: 1.5,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    addFoodText: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginTop: -1,
-    },
-    addMealRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        gap: 12,
-    },
-    plusCircle: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 1.5,
-        borderStyle: 'dashed',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    plusText: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginTop: -1,
-    },
-    addMealText: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
+  container: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Surface.border,
+    backgroundColor: Surface.card,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Surface.border,
+  },
+  rowCurrent: {
+    backgroundColor: Surface.elevated,
+  },
+  rowCompleted: {
+    backgroundColor: 'rgba(184, 214, 58, 0.06)',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkmark: {
+    color: '#111111',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  content: {
+    flex: 1,
+    gap: 4,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  nameWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+  },
+  nameText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  currentBadge: {
+    color: Accent.green,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  completedBadge: {
+    color: Accent.green,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  kcalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  kcalText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  suggestion: {
+    color: Surface.textDim,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  foods: {
+    marginTop: 4,
+    paddingTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Surface.border,
+  },
+  addFoodButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: '#4A4A4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addFoodText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: -1,
+  },
+  addFoodLink: {
+    color: Surface.textDim,
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  addMealRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  plusCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#4A4A4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusText: {
+    color: Surface.textDim,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: -1,
+  },
+  addMealText: {
+    color: Surface.textDim,
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });

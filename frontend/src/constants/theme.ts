@@ -7,6 +7,19 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+export const Accent = {
+  green: '#B8D63A',
+  greenDim: '#9ACD32',
+} as const;
+
+export const Surface = {
+  base: '#111111',
+  card: '#191919',
+  elevated: '#242424',
+  border: '#2E2E2E',
+  textDim: '#6E6E6E',
+} as const;
+
 export const Colors = {
   light: {
     text: '#000000',
@@ -14,13 +27,15 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    accent: Accent.green,
   },
   dark: {
     text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    background: '#111111',
+    backgroundElement: '#191919',
+    backgroundSelected: '#242424',
+    textSecondary: '#6E6E6E',
+    accent: Accent.green,
   },
 } as const;
 

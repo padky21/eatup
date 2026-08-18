@@ -1,69 +1,78 @@
-import { StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import AddMealModal from '@/components/add-meal-modal';
+import CalorieProgressRing from '@/components/calorie-counter';
+import DailySummary from '@/components/daily-summary';
+import MealList from '@/components/meal-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Accent } from '@/constants/theme';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { View } from 'react-native';
-import { useState } from 'react';
-import CalorieProgressRing from '@/components/calorie-counter';
-import MealList, { Meal } from '@/components/meal-card';
-
-const initialMeals: Meal[] = [
-  { id: '1', name: 'Breakfast', targetCalories: 750, completed: true },
-  { id: '2', name: 'Lunch', targetCalories: 900, completed: true },
-  { id: '3', name: 'Snack', subtitle: 'Now', targetCalories: 450, completed: false },
-  { id: '4', name: 'Dinner', targetCalories: 500, completed: false },
-];
+import { useApp } from '@/context/app-context';
+import { formatTodayDate } from '@/utils/nutrition';
 
 export default function HomeScreen() {
-  const [meals, setMeals] = useState<Meal[]>(initialMeals);
+  const {
+    state,
+    consumedCalories,
+    remainingCalories,
+    suggestedCalories,
+    currentMealId,
+    toggleMealComplete,
+    addFood,
+    removeFood,
+    addMeal,
+  } = useApp();
 
-  const totalCalories = meals.reduce((sum, m) => sum + m.targetCalories, 0);
-  const consumedCalories = meals
-    .filter((m) => m.completed)
-    .reduce((sum, m) => sum + m.targetCalories, 0);
-
-  const handleToggleComplete = (id: string) => {
-    setMeals((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, completed: !m.completed } : m))
-    );
-  };
-
-  const handleAddFood = (id: string) => {
-    // TODO: open food-logging flow for this meal
-    console.log('Add food to meal', id);
-  };
-
-  const handleAddMeal = () => {
-    // TODO: open a proper "new meal" flow (name + calorie target).
-    // Adding a placeholder meal for now so the list stays fully dynamic.
-    setMeals((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: `Meal ${prev.length + 1}`,
-        targetCalories: 0,
-        completed: false,
-      },
-    ]);
-  };
+  const [showAddMeal, setShowAddMeal] = useState(false);
+  const calorieTarget = state.profile.calorieTarget;
+  const meals = state.dailyPlan.meals;
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <ThemedText type="title" style={styles.title}>Today's Goal</ThemedText>
-          <ThemedText type="small">Wednesday, Feb 27</ThemedText>
-          <CalorieProgressRing current={consumedCalories} max={totalCalories} />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <ThemedText type="title" style={styles.title}>
+            Today&apos;s Goal
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {formatTodayDate()}
+          </ThemedText>
+
+          <CalorieProgressRing
+            current={consumedCalories}
+            max={calorieTarget}
+            color={Accent.green}
+          />
+
+          <DailySummary
+            consumed={consumedCalories}
+            target={calorieTarget}
+            remaining={remainingCalories}
+          />
 
           <MealList
             meals={meals}
-            onToggleComplete={handleToggleComplete}
-            onAddFood={handleAddFood}
-            onAddMeal={handleAddMeal}
+            currentMealId={currentMealId}
+            suggestedCalories={suggestedCalories}
+            onToggleComplete={toggleMealComplete}
+            onAddFood={addFood}
+            onRemoveFood={removeFood}
+            onAddMeal={() => setShowAddMeal(true)}
           />
-        </ThemedView>
+        </ScrollView>
       </SafeAreaView>
+
+      <AddMealModal
+        visible={showAddMeal}
+        onClose={() => setShowAddMeal(false)}
+        onAdd={addMeal}
+      />
     </ThemedView>
   );
 }
@@ -71,35 +80,25 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
-  heroSection: {
+  scrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
     paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.three,
+    gap: Spacing.three,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
   },
   title: {
     textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+    fontSize: 32,
+    lineHeight: 38,
+    marginTop: Spacing.two,
   },
 });
